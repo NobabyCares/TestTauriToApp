@@ -1,0 +1,61 @@
+name: Tauri Android Cloud Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CMAKE_PREFIX_PATH: ${{ runner.tool_cache }}/rustup/lib/rustlib/x86_64-unknown-linux-gnu/lib
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📂 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js & pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      
+      - name: 🐱 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - name: 🐧 Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libdata-glib-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: ☕ Setup Java & Android
+        uses: android-actions/setup-android@v3
+        with:
+          java-version: 17
+
+      - name: 📦 Install Dependencies
+        run: |
+          pnpm install
+          pnpm run tauri android init
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      - name: 🛠️ Build Android APK
+        run: pnpm run tauri android build --debug
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tauri-Android-Debug-APK
+          path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
